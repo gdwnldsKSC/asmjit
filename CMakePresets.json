@@ -34,6 +34,13 @@
     { "name": "conf-arm64e"      , "hidden": true, "environment": { "CFLAGS": "-arch arm64e", "CXXFLAGS": "-arch arm64e" } },
     { "name": "conf-avx2"        , "hidden": true, "environment": { "CXXFLAGS": "-mavx2 -mbmi -mbmi2 -mlzcnt -mpopcnt" } },
 
+    {
+      "name": "openvms-bootstrap",
+      "description": "OpenVMS static build (requires an OpenVMS toolchain)",
+      "inherits": ["conf-debug", "conf-static"],
+      "cacheVariables": { "ASMJIT_NO_JIT": "ON", "ASMJIT_NO_CUSTOM_FLAGS": "ON", "ASMJIT_TEST": "OFF" }
+    },
+
     { "name": "debug"            , "inherits": ["conf-debug", "conf-test", "conf-static"] },
     { "name": "debug-asan"       , "inherits": ["conf-debug", "conf-test", "conf-static", "conf-asan"] },
     { "name": "debug-msan"       , "inherits": ["conf-debug", "conf-test", "conf-static", "conf-msan"] },

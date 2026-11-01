@@ -41,6 +41,8 @@
 #
 #   cmake . -B build/Debug -DCMAKE_BUILD_TYPE=Debug -DASMJIT_TEST=ON
 #
+# OpenVMS bootstrap: cmake --preset openvms-bootstrap
+#
 # See <asmjit.com> for more details.
 
 cmake_minimum_required(VERSION 3.24 FATAL_ERROR)
@@ -521,6 +523,9 @@ elseif ("${CMAKE_SYSTEM_NAME}" STREQUAL "Haiku")
   # Dependency: libroot is used by Haiku instead of libc, so link to libroot and libpthread.
   message(STATUS "[asmjit] Adding 'libroot' and 'libpthread' dependencies (Haiku)")
   list(APPEND ASMJIT_LIBS root pthread)
+elseif ("${CMAKE_SYSTEM_NAME}" STREQUAL "OpenVMS")
+  # Dependency: OpenVMS links the C and pthread runtimes through IMAGELIB.
+  message(STATUS "[asmjit] Using native runtime dependencies (OpenVMS)")
 else()
   # Dependency: libc is always required.
   message(STATUS "[asmjit] Adding 'libc' dependency (Linux, BSD, or other UNIX/POSIX environment)")
