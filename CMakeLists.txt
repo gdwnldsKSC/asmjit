@@ -66,7 +66,7 @@ option(ASMJIT_STATIC           "Build 'asmjit' as a static library (implied by A
 option(ASMJIT_TEST             "Build 'asmjit' tests and benchmarks (development)" OFF)
 
 option(ASMJIT_NO_NATVIS        "Disable natvis support (embedding asmjit.natvis in PDB)" OFF)
-option(ASMJIT_NO_CUSTOM_FLAGS  "Disable extra compilation flags added by AsmJit to its targets" OFF)
+option(ASMJIT_NO_CUSTOM_FLAGS  "Disable optional compilation flags added by AsmJit to its targets" OFF)
 option(ASMJIT_NO_ABI_NAMESPACE "Disable the use of inline ABI namespace {asmjit::v...}" OFF)
 option(ASMJIT_NO_SHM_OPEN      "Disable the use of shm_open() (some platforms have better options)" OFF)
 option(ASMJIT_NO_X86           "Disable X86/X64 backend" OFF)
@@ -413,6 +413,32 @@ function(asmjit_detect_sanitizers out)
   set(${out} "${_out_array}" PARENT_SCOPE)
 endfunction()
 
+# Match OpenVMS argv pointers to the test harness.
+function(asmjit_detect_argv_cflags out)
+  set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+  set(required_flags "${CMAKE_REQUIRED_FLAGS}")
+  set(argv_flag_DEFAULT "")
+  set(argv_flag_CLANG "-pointer-size=argv64")
+  set(argv_flag_DCL "/POINTER_SIZE=LONG=ARGV")
+
+  foreach(mode DEFAULT CLANG DCL)
+    set(CMAKE_REQUIRED_FLAGS "${required_flags} ${argv_flag_${mode}}")
+    check_cxx_source_compiles("
+      int main(int argc, char* argv[]) {
+        static_assert(sizeof(void*) == ${CMAKE_SIZEOF_VOID_P}, \"Pointer size mismatch\");
+        static_assert(sizeof(argv[0]) == sizeof(char*), \"argv pointer size mismatch\");
+        const char* const* args = argv;
+        return argc > 0 && args[0] != nullptr ? 0 : 1;
+      }" ASMJIT_ARGV_${mode})
+    if (ASMJIT_ARGV_${mode})
+      set(${out} "${argv_flag_${mode}}" PARENT_SCOPE)
+      return()
+    endif()
+  endforeach()
+
+  message(FATAL_ERROR "[asmjit] OpenVMS tests require argv pointers matching the library pointer size")
+endfunction()
+
 function(asmjit_add_target target target_type)
   set(single_val "")
   set(multi_val SOURCES LIBRARIES CFLAGS CFLAGS_DBG CFLAGS_REL LFLAGS)
@@ -420,6 +446,7 @@ function(asmjit_add_target target target_type)
 
   if ("${target_type}" MATCHES "^(EXECUTABLE|TEST)$")
     add_executable(${target} ${X_SOURCES})
+    target_compile_options(${target} PRIVATE ${ASMJIT_TEST_ARGV_CFLAGS})
   else()
     add_library(${target} ${target_type} ${X_SOURCES})
   endif()
@@ -621,7 +648,7 @@ if (TRUE)
     # std::terminate, which results in two problems - C++ standard library is required and the resulting
     # binary is larger (because of implicit throw/catch blocks to handle exceptions, which are never used).
     #
-    # This can be disabled by `ASMJIT_NO_CUSTOM_FLAGS` option, which disables the use of any compiler flags.
+    # This can be disabled by ASMJIT_NO_CUSTOM_FLAGS.
     set_property(SOURCE asmjit/core/virt_mem.cpp APPEND PROPERTY COMPILE_OPTIONS ${ASMJIT_NOEXCEPT_CFLAGS})
 
     asmjit_add_target(asmjit "${ASMJIT_TARGET_TYPE}"
@@ -668,6 +695,11 @@ if (TRUE)
     if (ASMJIT_TEST)
       enable_testing()
       message(STATUS "[asmjit] Enabling AsmJit tests ('ASMJIT_TEST=${ASMJIT_TEST}')")
+
+      set(ASMJIT_TEST_ARGV_CFLAGS "")
+      if ("${CMAKE_SYSTEM_NAME}" STREQUAL "OpenVMS")
+        asmjit_detect_argv_cflags(ASMJIT_TEST_ARGV_CFLAGS)
+      endif()
 
       # asmjit_test_runner - optimize static builds (no need to build AsmJit twice).
       set(ASMJIT_TEST_RUNNER_SRC
